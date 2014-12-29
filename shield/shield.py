@@ -5,6 +5,7 @@ import redis
 import requests
 from celery import Celery
 from pprint import pprint
+from tasks import fetchstore
 import logging
 
 # Setup debug logger
@@ -12,9 +13,6 @@ logging.basicConfig(filename='debug.log',level=logging.DEBUG)
 
 # We have a flask app
 app = Flask(__name__)
-
-# Setup Celery Queue
-queue = Celery('lswshield', broker='redis://localhost:6379/0')
 
 # Setup Redis Cache
 rc = redis.StrictRedis(host='localhost', port=6379, db=0)
@@ -26,24 +24,24 @@ class ObjectShield:
 	def get_bucket (self, host):
 		return host.split(".")[0]
 
-	def ceph_url (self, bucket, file):
-		return "http://%s.ceph-svc-003.leasewebcdn.com/%s" % (bucket, file)
+	def ceph_url (self, bucket, filename):
+		return "http://%s.ceph-svc-003.leasewebcdn.com/%s" % (bucket, filename)
 
-	def origin_url (self, bucket, file):
-		return "%s/%s" % (origin[bucket], file)
+	def origin_url (self, bucket, filename):
+		return "%s/%s" % (origin[bucket], filename)
 
-	def cache_key (self, bucket, file):
-		return "%s-%s" % (bucket, file)
+	def cache_key (self, bucket, filename):
+		return "%s-%s" % (bucket, filename)
 
-	def hit_cache(self, bucket, file):
-		rc.get(self.cache_key(bucket, file))
+	def hit_cache(self, bucket, filename):
+		rc.get(self.cache_key(bucket, filename))
 
-	def set_hit_cache(self, bucket, file):
-		rc.set(self.cache_key(bucket, file), True)
+	def set_hit_cache(self, bucket, filename):
+		rc.set(self.cache_key(bucket, filename), True)
 
-	def get_head (self, bucket, file):
+	def get_head (self, bucket, filename):
 		try:
-			r = requests.head(self.ceph_url(bucket, file), timeout=2)
+			r = requests.head(self.ceph_url(bucket, filename), timeout=2)
 			if r.status_code == 200:
 				return True
 			else:
@@ -53,6 +51,7 @@ class ObjectShield:
 			return False
 
 	def add_queue(self, url, bucket):
+		fetchstore(url, bucket)
 		return True
 
 
